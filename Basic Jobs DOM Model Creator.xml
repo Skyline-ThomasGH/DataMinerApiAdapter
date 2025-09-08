@@ -1,0 +1,242 @@
+<DMSScript options="272" xmlns="http://www.skyline.be/automation">
+  <Name>Basic Jobs DOM Model Creator</Name>
+  <Description>Create a very basic DOM model with some dummy jobs</Description>
+  <Type>Automation</Type>
+  <Author>SKYLINE2\ThomasGH</Author>
+  <CheckSets>FALSE</CheckSets>
+  <Folder>
+  </Folder>
+  <Interactivity>Auto</Interactivity>
+  <Protocols>
+  </Protocols>
+  <Memory>
+  </Memory>
+  <Parameters>
+  </Parameters>
+  <Script>
+    <Exe id="1" type="csharp">
+      <Value><![CDATA[using System;
+using System.Collections.Generic;
+using Skyline.DataMiner.Automation;
+using Skyline.DataMiner.Net.Apps.DataMinerObjectModel;
+using Skyline.DataMiner.Net.Apps.Modules;
+using Skyline.DataMiner.Net.Apps.Sections.SectionDefinitions;
+using Skyline.DataMiner.Net.Sections;
+
+namespace DOM_BasicJobsModelCreator
+{
+    public class Script
+    {
+        private const string ModuleId = "my_dom_module";
+        private const int AmountOfJobs = 200;
+
+        private Engine _engine;
+        private DomHelper _domHelper;
+        private ModuleSettingsHelper _moduleSettingsHelper;
+        private Random _random;
+
+        private FieldDescriptor _nameFieldDescriptor;
+        private FieldDescriptor _startTimeFieldDescriptor;
+        private FieldDescriptor _endTimeFieldDescriptor;
+
+        private SectionDefinition _sectionDefinition;
+        private DomDefinition _domDefinition;
+
+
+        public void Run(Engine engine)
+        {
+            _engine = engine;
+            _engine.Timeout = TimeSpan.FromHours(12);
+
+            try
+            {
+                Setup();
+                InnerRun();
+            }
+            catch (ScriptAbortException e)
+            {
+                _engine.GenerateInformation(e.ToString());
+                throw;
+            }
+            catch (Exception e)
+            {
+                _engine.GenerateInformation(e.ToString());
+            }
+        }
+
+        private void Setup()
+        {
+            // Default module settings
+            _moduleSettingsHelper = new ModuleSettingsHelper(_engine.SendSLNetMessages);
+            _domHelper = new DomHelper(_engine.SendSLNetMessages, ModuleId);
+
+            _random = new Random();
+        }
+
+        private void InnerRun()
+        {
+            // Create ModuleSettings
+            var moduleSettings = new ModuleSettings(ModuleId);
+            _moduleSettingsHelper.ModuleSettings.Create(moduleSettings);
+
+            // Create SectionDefinition
+            _sectionDefinition = CreateSectionDefinition();
+
+            // Create DomDefinition
+            _domDefinition = new DomDefinition
+            {
+                ID = JobDomIds.DomDefinitionId,
+                SectionDefinitionLinks = new List<SectionDefinitionLink>()
+                {
+                    new SectionDefinitionLink(_sectionDefinition.GetID())
+                }
+            };
+            _domDefinition = _domHelper.DomDefinitions.Create(_domDefinition);
+
+            // Construct all DomInstances
+            _engine.GenerateInformation("Constructing all DomInstances");
+
+            for (int i = 0; i < AmountOfJobs; i++)
+            {
+                var instance = ConstructRandomJob();
+                _domHelper.DomInstances.Create(instance);
+            }
+        }
+
+        private DomInstance ConstructRandomJob()
+        {
+            var prefix = Names.JobNamePrefixes[_random.Next(0, Names.JobNamePrefixes.Count)];
+            var suffix = Names.JobNameSuffixes[_random.Next(0, Names.JobNameSuffixes.Count)];
+            var fullName = $"{prefix} {suffix}";
+
+            var start = DateTime.Now.AddMinutes(_random.Next(-5000, 5000));
+            var end = start.AddMinutes(_random.Next(15, 1000));
+
+            return ConstructDomInstance(fullName, start, end);
+        }
+
+        private DomInstance ConstructDomInstance(string name, DateTime start, DateTime end)
+        {
+            var domInstance = new DomInstance() { DomDefinitionId = _domDefinition.ID };
+            domInstance.AddOrUpdateFieldValue(_sectionDefinition, _nameFieldDescriptor, name);
+            domInstance.AddOrUpdateFieldValue(_sectionDefinition, _startTimeFieldDescriptor, start);
+            domInstance.AddOrUpdateFieldValue(_sectionDefinition, _endTimeFieldDescriptor, end);
+
+            return domInstance;
+        }
+
+        private SectionDefinition CreateSectionDefinition()
+        {
+            var sectionDefinition = new CustomSectionDefinition()
+            {
+                ID = JobDomIds.SectionDefinitionId,
+                Name = "PersonBaseInfo"
+            };
+
+            // First name field
+            _nameFieldDescriptor = new FieldDescriptor()
+            {
+                ID = JobDomIds.NameFieldDescriptorId,
+                FieldType = typeof(string),
+                Name = "Name"
+            };
+
+            // Last name field
+            _startTimeFieldDescriptor = new FieldDescriptor()
+            {
+                ID = JobDomIds.StartFieldDescriptorId,
+                FieldType = typeof(DateTime),
+                Name = "Start time"
+            };
+
+            // Age field
+            _endTimeFieldDescriptor = new FieldDescriptor()
+            {
+                ID = JobDomIds.EndFieldDescriptorId,
+                FieldType = typeof(DateTime),
+                Name = "End time"
+            };
+
+            sectionDefinition.AddOrReplaceFieldDescriptor(_nameFieldDescriptor);
+            sectionDefinition.AddOrReplaceFieldDescriptor(_startTimeFieldDescriptor);
+            sectionDefinition.AddOrReplaceFieldDescriptor(_endTimeFieldDescriptor);
+
+            return _domHelper.SectionDefinitions.Create(sectionDefinition);
+        }
+    }
+
+    public class JobDomIds
+    {
+        public static readonly DomDefinitionId DomDefinitionId =
+            new DomDefinitionId(Guid.Parse("e37fa9ba-1d6a-4789-b85d-8190213f5be2"));
+
+        public static readonly SectionDefinitionID SectionDefinitionId =
+            new SectionDefinitionID(Guid.Parse("0db4c52a-cbe1-46e4-8e0f-f76adde86819"));
+
+        public static readonly FieldDescriptorID NameFieldDescriptorId =
+            new FieldDescriptorID(Guid.Parse("01917961-b626-47df-887e-b5527da6c20a"));
+
+        public static readonly FieldDescriptorID StartFieldDescriptorId =
+            new FieldDescriptorID(Guid.Parse("a2cf5218-e595-464d-8700-141c3ef2ddfe"));
+
+        public static readonly FieldDescriptorID EndFieldDescriptorId =
+            new FieldDescriptorID(Guid.Parse("5a05e858-64c6-4101-b6b3-8527e68234d5"));
+    }
+
+    public class Names
+    {
+        public static List<string> JobNamePrefixes = new List<string>()
+        {
+            "Football",
+            "Basketball",
+            "Tennis",
+            "Concert",
+            "News",
+            "Weather",
+            "Documentary",
+            "TalkShow",
+            "AwardShow",
+            "Esports",
+            "Motorsport",
+            "Election",
+            "Parade",
+            "Festival",
+            "Debate",
+            "RealityShow",
+            "Drama",
+            "Comedy",
+            "Music",
+            "Charity",
+            "Premiere"
+        };
+
+        public static List<string> JobNameSuffixes = new List<string>()
+        {
+            "LiveBroadcast",
+            "PreShow",
+            "PostShow",
+            "HighlightReel",
+            "StudioCoverage",
+            "RemoteFeed",
+            "SatelliteUplink",
+            "OnSiteProduction",
+            "Replay",
+            "PressConference",
+            "RedCarpet",
+            "PanelDiscussion",
+            "InterviewSegment",
+            "Backstage",
+            "FieldReport",
+            "Simulcast",
+            "Webcast",
+            "PromoShoot",
+            "TechnicalTest",
+            "Rehearsal"
+        };
+    }
+}]]></Value>
+      <Message>
+      </Message>
+    </Exe>
+  </Script>
+</DMSScript>
