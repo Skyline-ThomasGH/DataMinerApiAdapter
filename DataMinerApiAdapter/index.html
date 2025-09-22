@@ -1,0 +1,35 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+	<title>SignalR Test</title>
+	<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+	<script src="/Scripts/jquery.signalR-2.4.3.min.js"></script>
+	<script src="/signalr/hubs"></script>
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="p-4">
+    <div class="container">
+        <h1 class="mb-4">Job Updates</h1>
+        <ul id="messages" class="list-group"></ul>
+    </div>
+
+	<script>
+		$(function () {
+			var connection = $.hubConnection();
+			var jobHub = connection.createHubProxy('jobHub');
+
+			jobHub.on('jobsUpdated', function (update) {
+				console.log("Job update received:", update);
+
+				$('#messages').append(
+					`<li class="list-group-item">Job(s) changed for module '${update.ModuleId}': ${update.AmountOfCreated} created, ${update.AmountOfUpdated} updated, ${update.AmountOfDeleted} deleted</li>`
+				);
+			});
+
+			connection.start().done(function () {
+				console.log("Connected to SignalR hub");
+			});
+		});
+	</script>
+</body>
+</html>

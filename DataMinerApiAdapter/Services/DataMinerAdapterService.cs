@@ -1,7 +1,10 @@
-﻿using System;
+﻿using DataMinerApiAdapter.Hubs;
+using DataMinerApiAdapter.Models;
+using Microsoft.AspNet.SignalR;
 using Skyline.DataMiner.Net;
 using Skyline.DataMiner.Net.Messages;
 using Skyline.DataMiner.Net.SubscriptionFilters;
+using System;
 
 namespace DataMinerApiAdapter.Services
 {
@@ -33,8 +36,17 @@ namespace DataMinerApiAdapter.Services
         {
             if (e.Message is DomInstancesChangedEventMessage domEvent)
             {
-                var updatedInstances = domEvent.Updated;
-                // Propagate the DOM update to somewhere
+                var webSocketEvent = new JobsUpdatedEvent
+                {
+                    ModuleId = domEvent.ModuleId,
+                    AmountOfCreated = domEvent.Created.Count,
+                    AmountOfUpdated = domEvent.Updated.Count,
+                    AmountOfDeleted = domEvent.Deleted.Count
+                };
+
+                // Send to all clients via SignalR
+                var context = GlobalHost.ConnectionManager.GetHubContext<JobHub>();
+                context.Clients.All.jobsUpdated(webSocketEvent);
             }
         }
 
