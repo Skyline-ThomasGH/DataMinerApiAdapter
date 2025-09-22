@@ -74,7 +74,7 @@ The project includes a **SignalR hub** and a demo web page to show how updates f
 
 1. **Add a user to the test DataMiner agent**
 
-1. **Update `DataMinerAdapterService.cs` to authenticate using that user.
+1. **Update `DataMinerAdapterService.cs`** to authenticate using that user.
 
 1. **Run the project** (F5 or Ctrl+F5).
    - By default, IIS Express will start and the API will be hosted on `localhost:<port>`.
